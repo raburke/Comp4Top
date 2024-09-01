@@ -12,4 +12,4 @@ All of the C++ programs here need to be compiled against the *Regina* libraries.
  
 In addition, there are also a number of Python scripts (to be used within *Regina*) for building certain triangulations and complexes, a rough work-in-progress script for locating embedded (minimal) tori within 4-manifold triangulations, and a *Regina* data file containing various triangulations discussed in [this paper](https://arxiv.org/abs/2402.15087).
 
---- *Rhuaidi Burke* (rhuaidi.burke@uq.edu.au)
+-- *Rhuaidi Burke* (rhuaidi.burke@uq.edu.au)
