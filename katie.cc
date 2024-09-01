@@ -754,7 +754,7 @@ void usage(const char* progName, const std::string& error = std::string()) {
     std::cerr << "Usage:" << std::endl;
     std::cerr << "    " << progName << " \"PD Code\" \"Framing Vector\", "
         " { -3, --dim3 | -4, --dim4 } "
-        "[ -g, --graph ] [ -r, --real ] [ -d, --debug ]\n"
+        "[ -g, --graph ] [ -d, --debug ]\n"
         "    " << progName << " [ -v, --version | -?, --help ]\n\n";
     std::cerr << "    -3, --dim3    : Build a 3-manifold via integer "
         "Dehn surgery.\n";
@@ -765,9 +765,9 @@ void usage(const char* progName, const std::string& error = std::string()) {
     std::cerr << "                    Use 'x' or '.' to denote 1-handles within the framing sequence.\n\n";
     std::cerr << "    -g, --graph   : Output an edge-coloured graph, "
         "not an isomorphism signature.\n";
-    std::cerr << "    -r, --real    : Builds the 4-manifold triangulation with real boundary "
-            "(not ideal or closed).\n";
-    std::cerr << "                    This option is incompatible with the --dim3 flag.\n\n";
+    //std::cerr << "    -r, --real    : Builds the 4-manifold triangulation with real boundary "
+    //        "(not ideal or closed).\n";
+    //std::cerr << "                    This option is incompatible with the --dim3 flag.\n\n";
     std::cerr << "    -d, --debug   : Display debug information.\n";
     std::cerr << "    -v, --version : Show which version of Regina "
         "is being used\n";
