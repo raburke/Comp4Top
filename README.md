@@ -8,7 +8,7 @@ The main contents of this repository are:
  - `usds.cc`: a utility which implements the Up-Side-Down Simplification heuristic.
  -  `bfb.cc`: source for *Brute Force Builder* which builds triangulations from a seed triangulation with (real) boundary.
 
-All of the C++ programs here need to be compiled against the *Regina* libraries.
+All of the C++ programs here need to be compiled against the *Regina* libraries. This is most easily accomplished on Linux or MacOS using the new `regina-helper` utility available via the [latest build of Regina](https://github.com/regina-normal/regina). Windows users will need to wait for the compiled binary, to be bundled with the official release of Regina 7.4.
  
 In addition, there are also a number of Python scripts (to be used within *Regina*) for building certain triangulations and complexes, a rough work-in-progress script for locating embedded (minimal) tori within 4-manifold triangulations, and a *Regina* data file containing various triangulations discussed in [this paper](https://arxiv.org/abs/2402.15087).
 
