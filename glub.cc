@@ -16,7 +16,7 @@ void usage(const char* progName, const std::string& error = std::string()) {
         std::cerr << error << "\n\n";
     }
     std::cerr << "Usage:" << std::endl;
-    std::cerr << "      " << progName << " { isoSig } \n";
+    std::cerr << "      " << progName << " { isoSig } [ isoSig2 ] \n";
     std::cerr << std::endl;
     exit(1);
 }
@@ -25,8 +25,18 @@ int main(int argc, char* argv[]) {
     if (argc < 2) {
         usage(argv[0], "Error: No sig provided.");
     }
-    
-    std::string sig = argv[1];
+    if (3 < argc) {
+        usage(argv[0], "Error: Expected at most 2 arguments.");
+    }
+    std::string sig, sig1, sig2;
+    sig1 = argv[1];
+    if (argc == 2) {
+        sig = sig1;
+    }
+    else if (argc == 3) {
+        sig2 = argv[2];
+        sig = sig1+sig2;
+    }
     
     const Triangulation<4>& tri = Triangulation<4>::fromIsoSig(sig);
     
@@ -118,4 +128,3 @@ int main(int argc, char* argv[]) {
     
     return 0;
 }
-
