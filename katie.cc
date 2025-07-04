@@ -42,7 +42,7 @@ struct node {
     int subgraphComponent = -1; // This is a component ID w.r.t to the subgraphs.
 };
 
-node emptyNode = node{-1,-1,-1};
+const node emptyNode = node{-1,-1,-1};
 
 struct edge {
     node n1 {};
@@ -308,6 +308,66 @@ public:
         }
     }
     
+    void addQuadriEdgesRealBdry(const std::vector<std::array<node,4>>& quadriList) {
+        long numQuadris = quadriList.size();
+        
+        for (int i=0; i<numQuadris; i++) {
+            std::array<node,4> currQuadri = quadriList[i];
+            
+            node R1 = {-(i+1),-1,0};
+            node R2 = {-(i+1),-2,0};
+            node R3 = {-(i+1),-3,0};
+            node R1d = {-(i+1),-4,0};
+            node R2d = {-(i+1),-5,0};
+            node R3d = {-(i+1),-6,0};
+            
+            adjList[currQuadri[0]][0] = R1d;
+            adjList[currQuadri[0]][3] = R3d;
+            adjList[currQuadri[1]][0] = R1;
+            adjList[currQuadri[1]][1] = R1;
+            adjList[currQuadri[2]][1] = R2;
+            adjList[currQuadri[2]][2] = R2;
+            adjList[currQuadri[3]][2] = R3;
+            adjList[currQuadri[3]][3] = R3;
+
+            adjList[R1d][0] = currQuadri[0];
+            adjList[R1d][1] = R2d;
+            adjList[R1d][2] = R1;
+            adjList[R1d][3] = R2d;
+            adjList[R1d][4] = R1;
+
+            adjList[R2d][0] = R3d;
+            adjList[R2d][1] = R1d;
+            adjList[R2d][2] = R3d;
+            adjList[R2d][3] = R1d;
+            adjList[R2d][4] = R2;
+
+            adjList[R3d][0] = R2d;
+            adjList[R3d][1] = R3;
+            adjList[R3d][2] = R2d;
+            adjList[R3d][3] = currQuadri[0];
+            adjList[R3d][4] = R3;
+            
+            adjList[R1][0] = currQuadri[1];
+            adjList[R1][1] = currQuadri[1];
+            adjList[R1][2] = R1d;
+            adjList[R1][3] = R2;
+            adjList[R1][4] = R1d;
+
+            adjList[R2][0] = R3;
+            adjList[R2][1] = currQuadri[2];
+            adjList[R2][2] = currQuadri[2];
+            adjList[R2][3] = R1;
+            adjList[R2][4] = R2d;
+
+            adjList[R3][0] = R2;
+            adjList[R3][1] = R3d;
+            adjList[R3][2] = currQuadri[3];
+            adjList[R3][3] = currQuadri[3];
+            adjList[R3][4] = R3d;
+        }
+    }
+    
     void addDoubleOneEdges() {
         for (const auto& [key,nbrs] : adjList) {
             if (
@@ -461,7 +521,7 @@ public:
         }
         std::clog << "Remaining nodes without a colour 4 edge: " << counter << std::endl;
     }
-    
+        
     void cleanup() {
         adjList.erase(emptyNode);
     }
@@ -592,7 +652,7 @@ std::vector<int> pdCodeOrientations(const pdcode& code) {
     while (!visited[i][j]) {
         
         bool carry = false;
-        int carryRow;
+        int carryRow = 0; // Thanks Lucy for pointing out initialisation bug.
 
         visited[i][j] = true;
         seenStrands.emplace_back(currentStrand);
@@ -754,7 +814,7 @@ void usage(const char* progName, const std::string& error = std::string()) {
     std::cerr << "Usage:" << std::endl;
     std::cerr << "    " << progName << " \"PD Code\" \"Framing Vector\", "
         " { -3, --dim3 | -4, --dim4 } "
-        "[ -g, --graph ] [ -d, --debug ]\n"
+        "[ -g, --graph ] [ -r, --real ] [ -d, --debug ]\n"
         "    " << progName << " [ -v, --version | -?, --help ]\n\n";
     std::cerr << "    -3, --dim3    : Build a 3-manifold via integer "
         "Dehn surgery.\n";
@@ -765,9 +825,9 @@ void usage(const char* progName, const std::string& error = std::string()) {
     std::cerr << "                    Use 'x' or '.' to denote 1-handles within the framing sequence.\n\n";
     std::cerr << "    -g, --graph   : Output an edge-coloured graph, "
         "not an isomorphism signature.\n";
-    //std::cerr << "    -r, --real    : Builds the 4-manifold triangulation with real boundary "
-    //        "(not ideal or closed).\n";
-    //std::cerr << "                    This option is incompatible with the --dim3 flag.\n\n";
+    std::cerr << "    -r, --real    : Builds the 4-manifold triangulation with real boundary "
+            "(not ideal or closed).\n";
+    std::cerr << "                    This option is incompatible with the --dim3 flag.\n\n";
     std::cerr << "    -d, --debug   : Display debug information.\n";
     std::cerr << "    -v, --version : Show which version of Regina "
         "is being used\n";
@@ -1117,7 +1177,7 @@ int main(int argc, char* argv[]) {
                 std::clog << "Self-framing 2-handle " << i << " (--)\n";
             }
             do {
-                linkObjWorking.r1(r1FramingSiteRef, 0 /* left */, -1, false, true);
+                linkObjWorking.r1(r1FramingSiteRef, 0 /* left */, -1);
                 --currentWrithe;
             } while (currentWrithe != currentFraming);
         }
@@ -1126,7 +1186,7 @@ int main(int argc, char* argv[]) {
                 std::clog << "Self-framing 2-handle " << i << " (++)\n";
             }
             do {
-                linkObjWorking.r1(r1FramingSiteRef, 0 /* left */, 1, false, true);
+                linkObjWorking.r1(r1FramingSiteRef, 0 /* left */, 1);
                 ++currentWrithe;
             } while (currentWrithe != currentFraming);
         }
@@ -1141,8 +1201,8 @@ int main(int argc, char* argv[]) {
             if (printDebugInfo) {
                 std::clog << "Adding additional pair of cancelling curls to 2-handle " << i << " to guarantee existence of a quadricolour...\n";
             }
-            linkObjWorking.r1(r1FramingSiteRef, 0, 1, false, true);
-            linkObjWorking.r1(r1FramingSiteRef, 0, -1, false, true);
+            linkObjWorking.r1(r1FramingSiteRef, 0, 1);
+            linkObjWorking.r1(r1FramingSiteRef, 0, -1);
         }
     }
     
@@ -1157,8 +1217,8 @@ int main(int argc, char* argv[]) {
         std::vector<std::pair<regina::StrandRef,regina::StrandRef>> tempQuadriCheck = findLinkQuadriPairs(twoHandle);
         if (tempQuadriCheck.empty()) {
             std::clog << "Adding another pair of cancelling curls to current component...\n";
-            linkObjWorking.r1(twoHandle, 0, -1, false, true);
-            linkObjWorking.r1(twoHandle, 0, 1, false, true);
+            linkObjWorking.r1(twoHandle, 0, -1);
+            linkObjWorking.r1(twoHandle, 0, 1);
         }
     }
     
