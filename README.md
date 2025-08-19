@@ -13,6 +13,6 @@ All of the C++ programs here need to be compiled against the [*Regina*](https://
 In addition, there are also a number of Python scripts (to be used within *Regina*) for building certain triangulations and complexes, a rough work-in-progress script for locating embedded (minimal) tori within 4-manifold triangulations, and a *Regina* data file containing various triangulations discussed in [this paper](https://arxiv.org/abs/2402.15087).
 
 ## *GluB*
-This is a new (Dec 24) utility for gluing two 4-manifolds with boundary together. Given either (i) a 4-manifold with two real boundary components, or (ii) two 4-manifolds each with one real boundary component, `glub` (*Glu*e *B*oundaries) will glue the boundaries together using all possible combinatorial isomorphisms of the boundaries and enumerate the resulting triangulations. As suggested by the previous sentence, the boundaries in question must be combinatorially isomorphic (not just homeomorphic).   
+This is a new (added Dec 2024) utility for gluing two 4-manifolds with boundary together. Given either (i) a 4-manifold with two real boundary components, or (ii) two 4-manifolds each with one real boundary component, `glub` (*Glu*e *B*oundaries) will glue the boundaries together using all possible combinatorial isomorphisms of the boundaries and enumerate the resulting triangulations. As suggested by the previous sentence, the boundaries in question must be combinatorially isomorphic (not just homeomorphic).
 
 -- *Rhuaidi Burke* (rhuaidi.burke@uq.edu.au)
