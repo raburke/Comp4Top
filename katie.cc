@@ -206,7 +206,6 @@ public:
         for (auto [currNode, nbrs] : adjList) {
             for (int i=0; i<4; i++) {
                 if (nbrs[i].nodeID != 0) {
-                    edge subbedEdge;
                     switch (nbrs[i].strand) {
                         case 0:
                             break;
@@ -434,8 +433,10 @@ public:
                             ((x.nodeID == 3) && (y.nodeID == 4)) ||
                             ((x.nodeID == 7) && (y.nodeID == 8))
                             ) {
-                            edge e = {x,y,4};
-                            addEdge(e);
+                            if ((adjList[x][4] == emptyNode) && (adjList[y][4] == emptyNode)) {
+                                edge e = {x,y,4};
+                                addEdge(e);
+                            }
                         }
                     }
                 }
@@ -451,8 +452,10 @@ public:
                             ((x.nodeID == 1) && (y.nodeID == 2)) ||
                             ((x.nodeID == 5) && (y.nodeID == 6))
                             ) {
-                            edge e = {x,y,4};
-                            addEdge(e);
+                            if ((adjList[x][4] == emptyNode) && (adjList[y][4] == emptyNode)) {
+                                edge e = {x,y,4};
+                                addEdge(e);
+                            }
                         }
                     }
                 }
@@ -566,33 +569,30 @@ void walkAroundLink(regina::Link lnk) {
 
 std::vector<std::pair<regina::StrandRef,regina::StrandRef>> findLinkQuadriPairs(const regina::StrandRef &twoHandle) {
     std::vector<std::pair<regina::StrandRef,regina::StrandRef>> result;
-    auto currentRef = twoHandle;
+    auto current = twoHandle;
     do {
-        auto next = currentRef.next();
-        if (isCurl(currentRef)) {
-            // The current crossing is a curl, and the next one is an undercrossing.
-            if (!isCurl(next) && (next.strand() == 0)) {
-                result.emplace_back(currentRef,next);
+        auto next = current.next();
+        if (isCurl(current)) {
+            // The current crossing is a curl, and the next crossing is a "true" undercrossing (not a curl).
+            if (!isCurl(next) && next == next.crossing()->lower()) {
+                result.emplace_back(current, next);
             }
-            // The current crossing is a curl, and the next one is a curl of the same sign.
-            if (isCurl(next)) {
-                if (next.crossing()->index() == currentRef.crossing()->index()) {
-                    auto next2 = next.next();
-                    if ((isCurl(next2)) && (next2.strand() == currentRef.strand())) {
-                        result.emplace_back(currentRef,next2);
-                    }
-                }
+            // The current crossing is a curl, and the next crossing is a curl of the same sign.
+            auto mateIsNext = (current.next().crossing()->index() == current.crossing()->index());
+            auto after = mateIsNext ? current.next().next() : current.prev().prev();
+            if (isCurl(after) && after.crossing()->sign() == current.crossing()->sign()) {
+                result.emplace_back(current, after);
             }
         }
         else {
-            // The current crossing is an undercrossing and the next one is a curl.
-            if ((currentRef.strand() == 0) && isCurl(next)) {
-                result.emplace_back(next,currentRef);
+            // The current crossing is a (true) undercrossing and the next crossing is a curl.
+            if (current == current.crossing()->lower() && isCurl(next)) {
+                result.emplace_back(next, current);
             }
         }
-        currentRef = currentRef.next();
-    } while (currentRef != twoHandle);
-    
+        current = current.next();
+    } while (current != twoHandle);
+        
     return result;
 }
 
@@ -638,7 +638,6 @@ std::vector<int> pdCodeOrientations(const pdcode& code) {
     std::array<int, 4> positive = {1,-1,-1,1};
     
     long pdLength = code.size();
-    int numberOfStrands = 2*pdLength;
 
     std::vector<std::array<int, 4>> extendedOrientationVector(pdLength,eovInit);
         
@@ -815,7 +814,7 @@ void usage(const char* progName, const std::string& error = std::string()) {
     std::cerr << "    " << progName << " \"PD Code\" \"Framing Vector\", "
         " { -3, --dim3 | -4, --dim4 } "
 //        "[ -g, --graph ] [ -r, --real ] [ -d, --debug ]\n"
-    "[ -g, --graph ] [ -d, --debug ]\n"
+    "[ -g, --graph ] [ -V, --verbose ]\n"
         "    " << progName << " [ -v, --version | -?, --help ]\n\n";
     std::cerr << "    -3, --dim3    : Build a 3-manifold via integer "
         "Dehn surgery.\n";
@@ -829,7 +828,7 @@ void usage(const char* progName, const std::string& error = std::string()) {
 //    std::cerr << "    -r, --real    : Builds the 4-manifold triangulation with real boundary "
 //            "(not ideal or closed).\n";
     std::cerr << "                    This option is incompatible with the --dim3 flag.\n\n";
-    std::cerr << "    -d, --debug   : Display debug information.\n";
+    std::cerr << "    -V, --verbose : Display information during the construction.\n";
     std::cerr << "    -v, --version : Show which version of Regina "
         "is being used\n";
     std::cerr << "    -?, --help    : Display this help\n\n";
@@ -844,7 +843,7 @@ int main(int argc, char* argv[]) {
     
     int dimFlag = 4; // Default to build a 4-manifold.
     bool outputGraph = false; // Default to ouptut an isomorphism signature.
-    bool realBdry = false; // Default to build closed/ideal triangulation.
+    // bool realBdry = false; // Default to build closed/ideal triangulation.
     
     // Check for standard arguments:
     for (int i=1; i<argc; ++i) {
@@ -923,7 +922,7 @@ int main(int argc, char* argv[]) {
      START Process Framings
      */
     std::string rawFramingInput = argv[2];
-    size_t rawFramingSize = rawFramingInput.size();
+
     
     std::vector<int> framingVector, twoHandleFramings;
     std::vector<bool> isOneHandleVector;
@@ -956,10 +955,10 @@ int main(int argc, char* argv[]) {
             else if (!strcmp(argv[i], "-g") || !strcmp(argv[i], "--graph")) {
                 outputGraph = true;
             }
-            else if (!strcmp(argv[i], "-r") || !strcmp(argv[i], "--real")) {
-                realBdry = true;
-            }
-            else if (!strcmp(argv[i], "-d") || !strcmp(argv[i], "--debug")) {
+//            else if (!strcmp(argv[i], "-r") || !strcmp(argv[i], "--real")) {
+//                realBdry = true;
+//            }
+            else if (!strcmp(argv[i], "-V") || !strcmp(argv[i], "--verbose")) {
                 printDebugInfo = true;
             }
             else {
@@ -1219,7 +1218,10 @@ int main(int argc, char* argv[]) {
         if (tempQuadriCheck.empty()) {
             std::clog << "Adding another pair of cancelling curls to current component...\n";
             linkObjWorking.r1(twoHandle, 0, -1);
+            linkObjWorking.r1(twoHandle, 0, -1);
             linkObjWorking.r1(twoHandle, 0, 1);
+            linkObjWorking.r1(twoHandle, 0, 1);
+
         }
     }
     
@@ -1359,7 +1361,7 @@ int main(int argc, char* argv[]) {
      START Link Quadricolour Search
      */
     // Make a list of all possible quadricolours per 2-handle.
-    // (Obviously indexed by/w.r.t 2-handle.)
+    // (Obviously indexed by 2-handle.)
     // Outer vector: 2-handle
     // Inner vector: List of quadricolours.
     // Pair: The pair of strand references which make up the quadricolour.
@@ -1367,6 +1369,11 @@ int main(int argc, char* argv[]) {
     for (int i=0; i<numberOfTwoHandles; i++) {
         auto twoHandle = twoHandleComponentRefs[i];
         std::vector<std::pair<regina::StrandRef,regina::StrandRef>> currentQuadricolourList = findLinkQuadriPairs(twoHandle);
+        if (currentQuadricolourList.empty()) {
+            std::cerr << "Internal error: no quadricolour pair found on 2-handle " << i <<".\n";
+            std::cerr << "Please contact the developer with the PD code and framing vector which led to this output." << std::endl;
+            exit(1);
+        }
 //        std::cerr << currentQuadricolourList.size() << std::endl;
         for (const auto& pair : currentQuadricolourList) {
             if (!isCurl(pair.second)) {
