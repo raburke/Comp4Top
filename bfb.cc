@@ -1,181 +1,141 @@
-/*
- Brute Force Builder (Basic/Stripped Back Version for BAB)
- 
- cout: Intermediate sigs.
- clog: Everything else (including "end"/"finished" sigs).
- */
-
+#include <stdio.h>
 #include <iostream>
+#include <fstream>
+#include <chrono>
+#include <ctime>
+#include <string>
+#include <cstring>
 #include <vector>
 #include <array>
 #include <iterator>
-#include <fstream>
-#include <string>
-#include <cstring>
 #include "triangulation/dim2.h"
 #include "triangulation/dim3.h"
 #include "triangulation/dim4.h"
-#include "triangulation/generic/facetpairing.h"
-#include <chrono>
+#include "utilities/randutils.h"
+#include "triangulation/facetpairing.h"
 
-void usage(const char* progName, const std::string& error = std::string()) {
+using namespace std;
+using namespace regina;
+
+void pdm(std::string msg) {
+    cerr << msg << "; ";
+}
+
+void usage(const char* progName, const string& error = string()) {
     if (!error.empty()) {
         std::cerr << error << "\n\n";
     }
-    std::cerr << "Usage:" << std::endl;
-    std::cerr << "    " << progName << " { Isomorphism signature | File of isomorphism signatures }  [ (-i | -r)=secondIsoSig ] [ -s ] \n\n";
-    std::cerr << "    -i : Insert a copy of the triangulation represented by the string \"secondIsoSig\" into the initially loaded triangulation. \n";
-    std::cerr << "    -r : Repeatedly insert a copy of the triangulation represented by the string \"secondIsoSig\" into the initial triangulation on each run. \n";
-    std::cerr << "    -s : Only perform a single pair of gluings (incompatible with the -r option). \n";
+    cerr << "Usage:" << endl;
+    cerr << "      " << progName << " { isoSig } [ -c=closedOnly ] [ -i=idealOnly ] [ -r=realOnly ] \n\n";
+    cerr << "       -c : Only print closed triangulations.\n";
+    cerr << "       -i : Only print ideal triangulations.\n";
+    cerr << "       -r : Only print triangulations with real boundary.\n";
+    cerr << endl;
     exit(1);
 }
 
+bool argCharComp(char arr[], char c) {
+    return arr[0] == '-' && arr[1] == c;
+}
+
 int main(int argc, char* argv[]) {
+    bool closedOnly, idealOnly, realOnly;
+    closedOnly = idealOnly = realOnly = false;
     
-    std::set<std::string> sigs;
-    
-    bool isFile = false;
-    bool singleGluing = false;
-    bool insertTri = false;
-    std::string insertTriSig;
-    bool repeatInsert = false;
-    bool runRepeatCheck = false;
+    bool preserveBdryComp = false;
+    int prescribedBdryComp = 0;
     
     if (argc < 2) {
-        usage(argv[0], "ERROR: Please provide an isomorphism signature or file of isomorphism signatures.");
+        usage(argv[0],"Error: No input given.");
     }
-    else if (2 <= argc) {
+    if (2 < argc) {
         for (int i=2; i<argc; ++i) {
-            /* For some reason when I started stripping back to get this version,
-            strncpy (I think) was giving me garbage so using the more clunky approach
-             you see here.*/
-//            char argShort[3];
-//            strncpy(argShort,argv[i],3);
-            if (argv[i][1] == 'i') {
-                insertTri = true;
-                insertTriSig = argv[i]+=3;
+            if (argCharComp(argv[i],'c')) {
+                closedOnly = true;
             }
-            else if (argv[i][1] == 'r' && argv[i][2] == '=') {
-                insertTri = true;
-                repeatInsert = true;
-                insertTriSig = argv[i]+=3;
+            else if (argCharComp(argv[i],'i')) {
+                idealOnly = true;
             }
-            else if (!strcmp(argv[i], "-r")) {
-                repeatInsert = true;
-                runRepeatCheck = true;
+            else if (argCharComp(argv[i],'r')) {
+                realOnly = true;
             }
-            else if (!strcmp(argv[i], "-s")) {
-                singleGluing = true;
+            else if (argCharComp(argv[i],'b')) {
+                preserveBdryComp = true;
+                if (argv[i+2] != NULL) {
+                    prescribedBdryComp = stoi(argv[i]+=2);
+                }
             }
             else {
-                usage(argv[0], std::string("Invalid option: ") + argv[i]);
+                usage(argv[0],string("Invalid option: ")+argv[i]);
             }
         }
     }
-       
-    if (runRepeatCheck) {
-        if (repeatInsert && !insertTri) {
-            usage(argv[0], std::string("ERROR: -r must either be used in conjunction with -i or of the form -r=secondIsoSig."));
-        }
-    }
-
-    std::string arg1 = argv[1];
-    for (char &c : arg1) {
-        if (c == '.') {
-            isFile = true;
-            break;
-        }
-    }
-        
-    if (isFile) {
-        std::ifstream sigsInputFile (arg1);
-        std::string currentSigRead;
-        if (sigsInputFile.is_open()) {
-            while (getline(sigsInputFile,currentSigRead)) {
-                if (insertTri && !repeatInsert) {
-                    sigs.emplace(insertTriSig+currentSigRead);
-                }
-                else {
-                    sigs.emplace(currentSigRead);
-                }
-                
-            }
-            sigsInputFile.close();
-        }
-        else {
-            usage(argv[0], std::string("ERROR: Could not open isomorphism signature file ") + arg1);
-        }
-    }
-    else {
-        if (insertTri && !repeatInsert) {
-            sigs.emplace(insertTriSig+arg1);
-        }
-        else {
-            sigs.emplace(arg1);
-        }
-    }
-        
-    std::set<std::string> intSigs;
-    std::set<std::string> closedSigs, idealSigs;
-           
-    auto t1 = std::chrono::high_resolution_clock::now();
-        
-    while (! sigs.empty()) {
     
-        for (const auto& currentSig : sigs) {
+    set<string> currSigs, intermediateSigs, closedSigs, idealSigs, realSigs;
+    
+    currSigs.emplace(argv[1]);
+    
+    while (!currSigs.empty()) {
+        for (const auto& curr : currSigs) {
+            Triangulation<4> tri = Triangulation<4>(curr);
+            tri.orient();
 
-            regina::Triangulation<4> tri;
-                        
-            if (repeatInsert) {
-                std::string augmentedSig = insertTriSig+currentSig;
-                tri = regina::Triangulation<4>::fromIsoSig(augmentedSig);
+            vector<pair<Simplex<4>*,int>> bdryData;
+            if (preserveBdryComp) {
+                for (const auto& bdryComp : tri.boundaryComponents()) {
+                    if (bdryComp->index() != prescribedBdryComp) {
+                        BoundaryComponent<4>* currBdryComp = bdryComp;
+                        auto currFacets = currBdryComp->facets();
+                        for (const auto& el : currFacets) {
+                            auto emb = el->embedding(0);
+                            Simplex<4>* pent = emb.simplex();
+                            int currFacetIndx = emb.vertices()[4];
+                            bdryData.emplace_back(pent,currFacetIndx);
+                        }
+                    }
+                }
+//                BoundaryComponent<4>* pbc = tri.boundaryComponent(prescribedBoundaryComponent);
+//                auto pbcFacets = pbc->facets();
+//                for (const auto& el : pbcFacets) {
+//                    auto emb = el->embedding(0);
+//                    Simplex<4>* pent = emb.simplex();
+//                    int facet_i = emb.vertices()[4];
+//                    bdryData.emplace_back(pent,facet_i);
+//                    clog << pent->index() << " " << facet_i << endl;
+//                }
             }
             else {
-                tri = regina::Triangulation<4>::fromIsoSig(currentSig);
-            }
-                        
-            tri.orient();
-            std::vector<std::pair<regina::Simplex<4>*,int>> boundaryData;
-
-            for (regina::Simplex<4>* pent : tri.pentachora()) {
-                for (int j=0; j<5; j++) {
-                    if (pent->face<3>(j)->isBoundary()) {
-                        boundaryData.emplace_back(pent,j);
+                for (Simplex<4>* pent : tri.pentachora()) {
+                    for (int i=0; i<5; i++) {
+                        if (pent->face<3>(i)->isBoundary()) {
+                            bdryData.emplace_back(pent,i);
+                        }
                     }
                 }
             }
-                        
-            for (const auto& xi : boundaryData) {
-                for (const auto& xj : boundaryData) {
-                    if ((xi.first->index() <= xj.first->index()) && (xi != xj)) {
-                        for (int s5index = 1; s5index < 120; s5index += 2 /* Odd perms only */) {
-                            regina::Perm<5> rawPerm = regina::Perm<5>::S5[s5index];
-                            if (rawPerm[xi.second] == xj.second) {
-
-                                xi.first->join(xi.second, xj.first, regina::Perm<5>(rawPerm));
-
+            
+            for (const auto& x : bdryData) {
+                for (const auto& y : bdryData) {
+                    if ((x.first->index() <= y.first->index()) && (x != y)) {
+                        for (int i=1; i<120; i+=2 /* Odd perms only */) {
+                            Perm<5> rawPerm = Perm<5>::S5[i];
+                            if (rawPerm[x.second] == y.second) {
+                                x.first->join(x.second, y.first, Perm<5>(rawPerm));
+                                
                                 bool isBad = false;
                                 
-                                /* Don't think we actually need this because it should be covered by the edge link check, right? */
-//                                for (regina::Vertex<4>* v : tri.vertices()) {
-//                                    const regina::Triangulation<3>& vLink = v->buildLink();
-//                                    if (!vLink.isOrientable()) {
-//                                        isBad = true;
-//                                    }
-//                                }
-                                
-                                for (regina::Edge<4>* e : tri.edges()) {
-                                    
+                                for (const Edge<4>* e : tri.edges()) {
                                     if (e->hasBadIdentification()) {
                                         isBad = true;
                                     }
                                     
-                                    const regina::Triangulation<2>& link = e->buildLink();
+                                    const Triangulation<2>& eLnk = e->buildLink();
                                     
-                                    if (!link.isOrientable()) {
+                                    if (!eLnk.isOrientable()) {
                                         isBad = true;
                                     }
-                                    if (link.countBoundaryComponents() + link.eulerChar() != 2) {
+                                    
+                                    if (eLnk.countBoundaryComponents() + eLnk.eulerChar() != 2) {
                                         isBad = true;
                                     }
                                 }
@@ -185,27 +145,30 @@ int main(int argc, char* argv[]) {
                                         isBad = true;
                                     }
                                 }
+                                
                                 if (!isBad) {
-                                    std::string newSig = tri.isoSig();
+                                    string goodSig = tri.isoSig();
                                     if (tri.isConnected() && tri.isOrientable()) {
                                         if (!tri.hasBoundaryFacets()) {
-                                            if (tri.isClosed()) {
-                                                closedSigs.emplace(newSig);
+                                            if (tri.isClosed() && !idealOnly && !realOnly) {
+                                                closedSigs.emplace(goodSig);
                                             }
                                             else {
-                                                idealSigs.emplace(newSig);
+                                                if (!closedOnly && !realOnly) {
+                                                    idealSigs.emplace(goodSig);
+                                                }
                                             }
                                         }
                                         else {
-                                            if (intSigs.emplace(newSig).second) {
-                                                std::cout << newSig << std::endl;
+                                            intermediateSigs.emplace(goodSig);
+                                            if (tri.isValid() && !closedOnly && !idealOnly) {
+                                                realSigs.emplace(goodSig);
                                             }
                                         }
                                     }
                                 }
                                 
-                                xi.first->unjoin(xi.second);
-                                
+                                x.first->unjoin(x.second);
                             }
                         }
                     }
@@ -213,41 +176,32 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        if (singleGluing) {
-            sigs.clear();
-            break;
-        }
-        else {
-            sigs.clear();
-            sigs.swap(intSigs);
-        }
+        currSigs.clear();
+        currSigs.swap(intermediateSigs);
+
     }
-    
-    auto t2 = std::chrono::high_resolution_clock::now();
-    
-    std::chrono::duration<double, std::milli> ms_double = t2 - t1;
     
     if (!closedSigs.empty()) {
         std::clog << std::endl;
         std::clog << "Closed (" << closedSigs.size() << "):" << std::endl;
         for (const auto& s : closedSigs) {
-            std::clog << s << std::endl;
+            std::cout << s << std::endl;
         }
     }
     if (!idealSigs.empty()) {
         std::clog << std::endl;
         std::clog << "Ideal (" << idealSigs.size() << "):" << std::endl;
         for (const auto& s : idealSigs) {
-            std::clog << s << std::endl;
+            std::cout << s << std::endl;
         }
     }
-    auto totalNumFound = closedSigs.size() + idealSigs.size();
-    if (totalNumFound != 0) {
+    if (!realSigs.empty()) {
         std::clog << std::endl;
-        std::clog << "Total number found: " << totalNumFound << " (" << closedSigs.size() << " Closed, " << idealSigs.size() << " Ideal)" << std::endl;
-        std::clog << std::endl;
-        std::clog << "Time taken: " << ms_double.count()/60000 << std::endl;
+        std::clog << "Real (" << realSigs.size() << "):" << std::endl;
+        for (const auto& s : realSigs) {
+            std::cout << s << std::endl;
+        }
     }
-
+    
     return 0;
 }

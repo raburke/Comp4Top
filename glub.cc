@@ -7,7 +7,7 @@
 #include <array>
 #include "triangulation/dim4.h"
 #include "triangulation/dim3.h"
-#include "triangulation/detail/triangulation.h"
+#include "triangulation/triangulation.h"
 
 using namespace regina;
 
@@ -16,7 +16,9 @@ void usage(const char* progName, const std::string& error = std::string()) {
         std::cerr << error << "\n\n";
     }
     std::cerr << "Usage:" << std::endl;
-    std::cerr << "      " << progName << " { isoSig } [ isoSig2 ] \n";
+    std::cerr << "      " << progName
+        << " { isoSig } [ isoSig2 ]"
+        << " [ --orientation=<preserving,reversing> ]\n";
     std::cerr << std::endl;
     exit(1);
 }
@@ -25,18 +27,40 @@ int main(int argc, char* argv[]) {
     if (argc < 2) {
         usage(argv[0], "Error: No sig provided.");
     }
-    if (3 < argc) {
-        usage(argv[0], "Error: Expected at most 2 arguments.");
+    if (4 < argc) {
+        usage(argv[0], "Error: Expected at most 3 arguments.");
     }
-    std::string sig, sig1, sig2;
-    sig1 = argv[1];
-    if (argc == 2) {
-        sig = sig1;
+
+    std::string sig1, sig2;
+    int orientation = 0;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        const std::string prefix = "--orientation=";
+        if (arg.rfind(prefix, 0) == 0) {
+            std::string value = arg.substr(prefix.size());
+            if (value == "preserving") {
+                orientation = 1;
+            } else if (value == "reversing") {
+                orientation = -1;
+            } else {
+                usage(argv[0], "Error: Unknown orientation.");
+            }
+        } else if (arg.rfind("--", 0) == 0) {
+            usage(argv[0], "Error: Unknown option.");
+        } else if (sig1.empty()) {
+            sig1 = arg;
+        } else if (sig2.empty()) {
+            sig2 = arg;
+        } else {
+            usage(argv[0], "Error: Expected at most 2 isoSig arguments.");
+        }
     }
-    else if (argc == 3) {
-        sig2 = argv[2];
-        sig = sig1+sig2;
+
+    if (sig1.empty()) {
+        usage(argv[0], "Error: No sig provided.");
     }
+
+    std::string sig = sig1 + sig2;
     
     const Triangulation<4>& tri = Triangulation<4>::fromIsoSig(sig);
     
@@ -83,15 +107,28 @@ int main(int argc, char* argv[]) {
     const auto& b1b = b1->build();
     
     std::vector<Isomorphism<3>> allIsos;
-    const auto& findAllIsos = b0b.findAllIsomorphisms(b1b, [&allIsos](
+    size_t unfilteredIsos = 0;
+    b0b.findAllIsomorphisms(b1b, [&allIsos, &orientation, &unfilteredIsos](
         const Isomorphism<3>& currIso) {
+            ++unfilteredIsos;
+            if (orientation == 1 && !currIso.isEven()) {
+                return false;
+            }
+            if (orientation == -1 && currIso.isEven()) {
+                return false;
+            }
             allIsos.emplace_back(currIso);
             return false;
         }
     );
     
-    if (allIsos.empty()) {
+    if (unfilteredIsos == 0) {
         std::cerr << "Error: Boundaries are not combinatorially isomorphic!\n";
+        exit(1);
+    }
+    if (allIsos.empty()) {
+        std::cerr << "Error: No boundary isomorphisms match the requested "
+            << "orientation.\n";
         exit(1);
     }
     
@@ -113,7 +150,8 @@ int main(int argc, char* argv[]) {
     
     for (const auto& currIso : allIsos) {
         Triangulation<4> working(tri);
-        for (int i=0; i<currIso.size(); i++) {
+        // Perm<5> ansPerm;
+		for (int i=0; i<currIso.size(); i++) {
             // TODO: Document construction of permutation.
             Perm<5> perm = b1->facet(currIso.simpImage(i))->embedding(0).vertices() * Perm<5>::extend(currIso.facetPerm(i)) * b0->facet(i)->embedding(0).vertices().inverse();
             
@@ -122,6 +160,7 @@ int main(int argc, char* argv[]) {
             int facet = b0Facets[i];
             
             me->join(facet,you,perm);
+			// ansPerm = perm;
         }
         std::cout << working.isoSig() << std::endl;
     }
